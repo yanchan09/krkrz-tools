@@ -81,27 +81,3 @@ class KeyDerivator:
             key_buffer[i] ^= upper_key[i - 64]
 
         return TableKeys(key_buffer)
-
-
-if __name__ == "__main__":
-    import sys
-    import json
-
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <params file>")
-        sys.exit(1)
-
-    with open(sys.argv[1]) as f:
-        params = json.load(f)
-
-    derivator = KeyDerivator(
-        bootstrap_string=params["bootstrap_string"],
-        warning_string=params["warning_string"],
-        params_blob=bytes.fromhex(params["params_blob"]),
-        archive_unique_key=params["archive_unique_key"],
-        upper_key_seed=bytes.fromhex(params["upper_key_seed"]),
-    )
-    keys = derivator.derive()
-    print(f"Key:\t\t{keys.key.hex()}")
-    print(f"Nonce A:\t{keys.nonce_a.hex()}")
-    print(f"Nonce B:\t{keys.nonce_b.hex()}")
