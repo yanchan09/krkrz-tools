@@ -1,0 +1,10 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: krkrz-tools
+Upstream-Contact: yanchan09 <yan@omg.lol>
+Source: https://github.com/yanchan09/krkrz-tools
+
+# Sample paragraph, commented out:
+#
+# Files: src/*
+# Copyright: $YEAR $NAME <$CONTACT>
+# License: ...

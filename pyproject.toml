@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2024 yanchan09 <yan@omg.lol>
+#
+# SPDX-License-Identifier: 0BSD
+
+[tool.poetry]
+name = "krkrz-tools"
+version = "0.1.0"
+description = "Reverse engineering tools related to KiriKiri Z visual novel engine"
+authors = ["yanchan09 <yan@omg.lol>"]
+license = "0BSD"
+packages = [
+	{include = "krkrz"}
+]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+argon2-cffi = "^23.1.0"
+pycryptodome = "^3.20.0"
+exrex = "^0.11.0"
+pefile = "^2023.2.7"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+pytest-cov = "^4.1.0"
+ruff = "^0.3.4"
+mypy = "^1.9.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--import-mode=importlib",
+]
+

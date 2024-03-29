@@ -1,5 +1,9 @@
+# SPDX-FileCopyrightText: 2024 yanchan09 <yan@omg.lol>
+#
+# SPDX-License-Identifier: 0BSD
+
 import struct
-from cx3.hashdb import HashType, HashDatabase
+from krkrz.cx3.hashdb import HashType, HashDatabase
 
 
 class MarshalReader:
@@ -7,14 +11,7 @@ class MarshalReader:
         self.data = data
         self.offset = 0
 
-    def parse(self) -> list:
-        values = []
-        while self.offset < len(self.data):
-            value = self.read_next_value()
-            values.append(value)
-        return values
-
-    def read_next_value(self) -> bytes | list | int:
+    def read_value(self) -> bytes | list | int:
         kind = self.data[self.offset]
         self.offset += 1
         if kind == 0x81:  # array
@@ -22,8 +19,8 @@ class MarshalReader:
             self.offset += 4
 
             values = []
-            for i in range(count):
-                values.append(self.read_next_value())
+            for _ in range(count):
+                values.append(self.read_value())
             return values
         elif kind == 0x03:  # bytes
             (size,) = struct.unpack(">I", self.data[self.offset : self.offset + 4])
@@ -47,7 +44,7 @@ class FileEntry:
         self.key = value[1][1]
 
 
-def dump_hash(hash: (HashType, bytes), hdb: HashDatabase | None) -> str:
+def dump_hash(hash: tuple[int, bytes], hdb: HashDatabase | None) -> str:
     resolved_name = None
     if hdb:
         resolved_name = hdb.resolve_hash(hash[0], hash[1])
@@ -77,8 +74,10 @@ class PathEntry:
 
 class ArchiveTable:
     def __init__(self, data: bytes) -> None:
-        parsed = MarshalReader(data).parse()
-        self.paths = [PathEntry(v) for v in parsed]
+        parsed = MarshalReader(data).read_value()
+        if not isinstance(parsed, list):
+            raise Exception("Expected marshalled table type to be a list")
+        self.paths = [PathEntry(parsed[i : i + 2]) for i in range(0, len(parsed), 2)]
 
     def dump(self, hdb: HashDatabase | None) -> None:
         for path in self.paths:

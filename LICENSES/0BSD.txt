@@ -1,4 +1,4 @@
-Copyright (C) 2024 by yanchan09 <yan@omg.lol>
+Copyright (C) YEAR by AUTHOR EMAIL
 
 Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted.
 

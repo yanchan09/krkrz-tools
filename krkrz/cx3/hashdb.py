@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2024 yanchan09 <yan@omg.lol>
+#
+# SPDX-License-Identifier: 0BSD
+
 import sqlite3
 
 
@@ -10,6 +14,12 @@ class HashDatabase:
     def __init__(self, path: str) -> None:
         self.conn = sqlite3.connect(path)
         self.cursor = self.conn.cursor()
+
+        self.cursor.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS known_hashes (type, hash, key, value, extra, UNIQUE(type, hash));
+            """
+        )
 
     def resolve_hash(self, kind: int, hash: bytes) -> None | str:
         self.cursor.execute(

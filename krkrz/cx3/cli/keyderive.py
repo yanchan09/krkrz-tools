@@ -1,7 +1,10 @@
-import sys
+# SPDX-FileCopyrightText: 2024 yanchan09 <yan@omg.lol>
+#
+# SPDX-License-Identifier: 0BSD
+
 import argparse
 import json
-from cx3.crypt import KeyDerivator
+from krkrz.cx3.crypt import KeyDerivator
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="keyderive")
