@@ -13,7 +13,9 @@ def test_arithmetic():
     assert i.value == 142
     i.exec_one(Instruction.ADD_ONE, 0)
     assert i.value == 143
-    i.exec_one(Instruction.SUBTRACT_ARG, 101)
+    i.exec_one(Instruction.SUBTRACT_ONE, 0)
+    assert i.value == 142
+    i.exec_one(Instruction.SUBTRACT_ARG, 100)
     assert i.value == 42
     i.exec_one(Instruction.BITWISE_NOT, 0)
     assert i.value == 0xFFFFFFD5
@@ -36,7 +38,7 @@ def test_arithmetic():
     assert i.value == 6720
     i.exec_one(Instruction.SHR_CONTEXT, 0)
     assert i.value == 210
-    i.exec_one(Instruction.SUB_FROM_CONTEXT, 0)
+    i.exec_one(Instruction.SUBTRACT_FROM_CONTEXT, 0)
     assert i.value == 0xFFFFFF33  # -205 in two's complement
     i.exec_one(Instruction.ADD_ARG, 205)
     assert i.value == 0
