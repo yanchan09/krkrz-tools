@@ -158,13 +158,13 @@ class BytecodeTooLargeException(Exception):
 
 
 INSTRUCTION_COSTS = {
-    Instruction.ADD_ARG: 5,
+    Instruction.ADD_ARG: 1,  # +4 argument
     Instruction.ADD_CONTEXT: 2,
     Instruction.ADD_ONE: 1,
     Instruction.BITWISE_NOT: 2,
-    Instruction.BITWISE_XOR: 5,
-    Instruction.LOAD_ARG: 5,
-    Instruction.LOAD_FROM_BUFFER: 11,
+    Instruction.BITWISE_XOR: 1,  # +4 argument
+    Instruction.LOAD_ARG: 1,  # +4 argument
+    Instruction.LOAD_FROM_BUFFER: 7,  # +4 argument
     Instruction.LOAD_FROM_BUFFER_INDIRECT: 13,
     Instruction.LOAD_INPUT: 2,
     Instruction.MULTIPLY_CONTEXT: 3,
@@ -176,7 +176,7 @@ INSTRUCTION_COSTS = {
     Instruction.SHUFFLE: 21,
     Instruction.SUBTRACT_FROM_CONTEXT: 4,
     Instruction.SUBROUTINE: 1,
-    Instruction.SUBTRACT_ARG: 5,
+    Instruction.SUBTRACT_ARG: 1,  # +4 argument
     Instruction.SUBTRACT_CONTEXT: 2,
     Instruction.SUBTRACT_ONE: 1,
 }
@@ -193,9 +193,14 @@ class TrackedBytecodeBuffer:
         self.current_cost = 0
         self.buffer: list[BytecodeInstruction] = []
 
-    def append(self, i: BytecodeInstruction) -> None:
-        self.add_cost(INSTRUCTION_COSTS[i[0]])
-        self.buffer.append(i)
+    def append(self, i: Instruction, arg: int = 0) -> None:
+        self.add_cost(INSTRUCTION_COSTS[i])
+        self.buffer.append((i, arg))
+
+    def set_argument(self, arg: int) -> None:
+        self.add_cost(4)
+        inst, _ = self.buffer[len(self.buffer) - 1]
+        self.buffer[len(self.buffer) - 1] = (inst, arg)
 
     def add_cost(self, cost: int) -> None:
         self.current_cost += cost
@@ -231,79 +236,25 @@ class BytecodeEmitter:
             try:
                 buffer.add_cost(9)
                 self.emit_subroutine(buffer, rounds)
-                buffer.append((Instruction.RETURN, 0))
+                buffer.append(Instruction.RETURN)
                 buffer.add_cost(5)
                 return buffer.unwrap()
             except BytecodeTooLargeException:
                 continue
         raise Exception("Failed to generate bytecode")
 
-    def emit_rounds(
-        self, rounds: int, max_cost: int = 128
-    ) -> list[BytecodeInstruction]:
-        buffer = TrackedBytecodeBuffer(max_cost)
-        buffer.add_cost(9)
-        self.emit_subroutine(buffer, rounds)
-        buffer.append((Instruction.RETURN, 0))
-        buffer.add_cost(5)
-        return buffer.unwrap()
-
-    def _lookup_even(self, val: int) -> BytecodeInstruction:
-        val = val % 8
-        if val == self.order[0]:
-            return (Instruction.BITWISE_NOT, 0)
-        elif val == self.order[1]:
-            return (Instruction.NEGATE, 0)
-        elif val == self.order[2]:
-            return (Instruction.ADD_ONE, 0)
-        elif val == self.order[3]:
-            return (Instruction.SUBTRACT_ONE, 0)
-        elif val == self.order[4]:
-            return (Instruction.SHUFFLE, 0xAAAAAAAA)
-        elif val == self.order[5]:
-            return (Instruction.BITWISE_XOR, self._rnd32())
-        elif val == self.order[6]:
-            arg = self._rnd32()
-            if arg % 2 == 0:
-                return (Instruction.SUBTRACT_ARG, self._rnd32())
-            else:
-                return (Instruction.ADD_ARG, self._rnd32())
-        elif val == self.order[7]:
-            return (Instruction.LOAD_FROM_BUFFER_INDIRECT, 0x3FF)
-        else:
-            raise Exception("_lookup_even failed")
-
-    def _lookup_odd(self, val: int) -> BytecodeInstruction:
-        val = val % 6
-        if val == self.order[8]:
-            return (Instruction.ADD_CONTEXT, 0)
-        elif val == self.order[9]:
-            return (Instruction.SUBTRACT_CONTEXT, 0)
-        elif val == self.order[10]:
-            return (Instruction.SUBTRACT_FROM_CONTEXT, 0)
-        elif val == self.order[11]:
-            return (Instruction.MULTIPLY_CONTEXT, 0)
-        elif val == self.order[12]:
-            return (Instruction.SHL_CONTEXT, 0)
-        elif val == self.order[13]:
-            return (Instruction.SHR_CONTEXT, 0)
-        else:
-            raise Exception("_lookup_odd failed")
-
-    def _lookup_final(self, val: int) -> BytecodeInstruction:
-        val = val % 3
-        if val == self.order[14]:
-            return (Instruction.LOAD_ARG, self._rnd32() & 0xFFFFFFFF)
-        elif val == self.order[15]:
-            return (Instruction.LOAD_INPUT, 0)
-        elif val == self.order[16]:
-            return (Instruction.LOAD_FROM_BUFFER, self._rnd32() & 0x3FF)
-        else:
-            raise Exception("_lookup_final failed")
-
     def emit_final(self, buf: TrackedBytecodeBuffer) -> None:
-        val = self._rnd32()
-        buf.append(self._lookup_final(val))
+        val = self._rnd32() % 3
+        if val == self.order[14]:
+            buf.append(Instruction.LOAD_ARG)
+            buf.set_argument(self._rnd32() & 0xFFFFFFFF)
+        elif val == self.order[15]:
+            buf.append(Instruction.LOAD_INPUT)
+        elif val == self.order[16]:
+            buf.append(Instruction.LOAD_FROM_BUFFER)
+            buf.set_argument(self._rnd32() & 0x3FF)
+        else:
+            raise Exception("emit_final failed")
 
     def emit_subroutine(
         self,
@@ -312,22 +263,37 @@ class BytecodeEmitter:
     ) -> None:
         if step == 1:
             return self.emit_final(buf)
-        buf.append((Instruction.SUBROUTINE, 0))
-        val = self._rnd32()
-        if val % 2 == 0:
-            self.emit_inner(buf, step - 1)
-        else:
-            self.emit_subroutine(buf, step - 1)
-        buf.append((Instruction.SAVE_TO_CONTEXT, 0))
+
+        buf.append(Instruction.SUBROUTINE)
         val = self._rnd32()
         if val % 2 == 0:
             self.emit_inner(buf, step - 1)
         else:
             self.emit_subroutine(buf, step - 1)
 
+        buf.append(Instruction.SAVE_TO_CONTEXT)
         val = self._rnd32()
-        buf.append(self._lookup_odd(val))
-        buf.append((Instruction.RETURN, 0))
+        if val % 2 == 0:
+            self.emit_inner(buf, step - 1)
+        else:
+            self.emit_subroutine(buf, step - 1)
+
+        val = self._rnd32() % 6
+        if val == self.order[8]:
+            buf.append(Instruction.ADD_CONTEXT)
+        elif val == self.order[9]:
+            buf.append(Instruction.SUBTRACT_CONTEXT)
+        elif val == self.order[10]:
+            buf.append(Instruction.SUBTRACT_FROM_CONTEXT)
+        elif val == self.order[11]:
+            buf.append(Instruction.MULTIPLY_CONTEXT)
+        elif val == self.order[12]:
+            buf.append(Instruction.SHL_CONTEXT)
+        elif val == self.order[13]:
+            buf.append(Instruction.SHR_CONTEXT)
+        else:
+            raise Exception("emit_subroutine failed")
+        buf.append(Instruction.RETURN)
 
     def emit_inner(
         self,
@@ -343,8 +309,31 @@ class BytecodeEmitter:
         else:
             self.emit_subroutine(buf, step - 1)
 
-        val = self._rnd32()
-        buf.append(self._lookup_even(val))
+        val = self._rnd32() % 8
+        if val == self.order[0]:
+            buf.append(Instruction.BITWISE_NOT)
+        elif val == self.order[1]:
+            buf.append(Instruction.NEGATE)
+        elif val == self.order[2]:
+            buf.append(Instruction.ADD_ONE)
+        elif val == self.order[3]:
+            buf.append(Instruction.SUBTRACT_ONE)
+        elif val == self.order[4]:
+            buf.append(Instruction.SHUFFLE, 0xAAAAAAAA)
+        elif val == self.order[5]:
+            buf.append(Instruction.BITWISE_XOR)
+            buf.set_argument(self._rnd32())
+        elif val == self.order[6]:
+            arg = self._rnd32()
+            if arg % 2 == 0:
+                buf.append(Instruction.SUBTRACT_ARG)
+            else:
+                buf.append(Instruction.ADD_ARG)
+            buf.set_argument(self._rnd32())
+        elif val == self.order[7]:
+            buf.append(Instruction.LOAD_FROM_BUFFER_INDIRECT, 0x3FF)
+        else:
+            raise Exception("emit_inner failed")
 
 
 class Blackbox:
